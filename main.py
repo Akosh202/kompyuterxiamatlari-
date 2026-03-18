@@ -1,6 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-from PIL import Image
 import io
 
 TOKEN = "8761556951:AAF44rheez1rpLeUt3VwbQdZtQbSsI2ZIMQ"
@@ -16,15 +15,6 @@ def main_menu():
         [InlineKeyboardButton("📩 Admin bilan bog‘lanish", callback_data="admin")]
     ]
     return InlineKeyboardMarkup(keyboard)
-
-# RASM TEKSHIRISH
-def is_image(file_bytes):
-    try:
-        img = Image.open(io.BytesIO(file_bytes))
-        img.verify()  # Rasm to‘g‘ri bo‘lsa, xato chiqmaydi
-        return True
-    except Exception:
-        return False
 
 # START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -73,7 +63,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MESSAGE (FORMA VA ADMIN)
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text if update.message.text else None
-    photo = update.message.photo[-1].get_file() if update.message.photo else None
 
     # BUYURTMA FORMASI
     if context.user_data.get("step") == "name":
@@ -90,20 +79,10 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name = context.user_data["name"]
         phone = context.user_data["phone"]
 
-        # Agar foydalanuvchi rasm yuborgan bo‘lsa, tekshiramiz
-        if photo:
-            file_bytes = await photo.download_as_bytearray()
-            if is_image(file_bytes):
-                img_msg = "📷 Rasm qabul qilindi!"
-            else:
-                img_msg = "❌ Bu rasm emas yoki noto‘g‘ri format!"
-        else:
-            img_msg = "📷 Rasm jo‘natilmadi."
-
         # ADMINGA YUBORISH
         await context.bot.send_message(
             chat_id=ADMIN_ID,
-            text=f"🆕 BUYURTMA:\n👤 {name}\n📞 {phone}\n💼 {text}\n{img_msg}"
+            text=f"🆕 BUYURTMA:\n👤 {name}\n📞 {phone}\n💼 {text}"
         )
 
         await update.message.reply_text("✅ Buyurtmangiz yuborildi! Tez orada bog‘lanamiz.")
@@ -126,6 +105,6 @@ app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(button))
-app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message))
+app.add_handler(MessageHandler(filters.TEXT, message))
 
 app.run_polling()
