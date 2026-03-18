@@ -1,101 +1,110 @@
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# === SOZLAMALAR ===
-TOKEN = "8341785424:AAHk6krDSn0PUy5G0ia-7BhbklGeukxMhS0"
-ADMIN_ID =8439075898  # admin Telegram ID
+TOKEN = "8761556951:AAF44rheez1rpLeUt3VwbQdZtQbSsI2ZIMQ"
+ADMIN_ID = 8439075898
 
-users = {}
+# MENU
+def main_menu():
+    keyboard = [
+        [InlineKeyboardButton("🤖 Bot yaratish", callback_data="bot")],
+        [InlineKeyboardButton("🌐 Sayt yaratish", callback_data="site")],
+        [InlineKeyboardButton("📂 Portfolio", callback_data="portfolio")],
+        [InlineKeyboardButton("📝 Buyurtma berish", callback_data="order")],
+        [InlineKeyboardButton("📩 Admin bilan bog‘lanish", callback_data="admin")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-services_keyboard = ReplyKeyboardMarkup(
-    [
-        ["💻 Windows o‘rnatish", "🧹 Kompyuter tozalash"],
-        ["🛠 Dastur o‘rnatish", "🔒 Virus tozalash"],
-        ["📝 Boshqa xizmat"]
-    ],
-    resize_keyboard=True
-)
-
-# /start komandasi
+# START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    users[user_id] = {"step": "name"}
-    await update.message.reply_text("👤 Ism va familiyangizni kiriting:")
+    await update.message.reply_text(
+        "👋 Salom! Men sizga professional xizmatlar taklif qilaman.\n\nXizmatni tanlang 👇",
+        reply_markup=main_menu()
+    )
 
-# Matnlar bilan ishlash
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-    user_id = user.id
+# BUTTON BOSILGANDA
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "bot":
+        await query.message.reply_text(
+            "🤖 Telegram bot yasab beraman!\n\n"
+            "✔ Avto javob\n✔ To‘lov tizimi\n✔ Admin panel\n\n"
+            "Narx: 150k dan\n\n"
+            "Buyurtma berish uchun pastdagi tugmani bosing 👇"
+        )
+
+    elif query.data == "site":
+        await query.message.reply_text(
+            "🌐 Website yasab beraman!\n\n"
+            "✔ Landing page\n✔ Biznes sayt\n✔ Tez va chiroyli dizayn\n\n"
+            "Narx: 200k dan\n\n"
+            "Buyurtma berish uchun menyudan foydalaning 👇"
+        )
+
+    elif query.data == "portfolio":
+        await query.message.reply_text(
+            "📂 Mening ishlarim:\n\n"
+            "🌐 https://sening-sayting1.netlify.app\n"
+            "🌐 https://sening-sayting2.netlify.app\n\n"
+            "🤖 https://t.me/sen_yasagan_bot\n"
+        )
+
+    elif query.data == "order":
+        await query.message.reply_text("📝 Ismingizni yozing:")
+        context.user_data["step"] = "name"
+
+    elif query.data == "admin":
+        await query.message.reply_text("✍️ Xabaringizni yozing:")
+        context.user_data["step"] = "admin_message"
+
+# MESSAGE (FORMA VA ADMIN)
+async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if user_id not in users:
-        await start(update, context)
-        return
+    # BUYURTMA FORMASI
+    if context.user_data.get("step") == "name":
+        context.user_data["name"] = text
+        await update.message.reply_text("📞 Telefon raqamingizni yozing:")
+        context.user_data["step"] = "phone"
 
-    step = users[user_id]["step"]
+    elif context.user_data.get("step") == "phone":
+        context.user_data["phone"] = text
+        await update.message.reply_text("💼 Qaysi xizmat kerak? (bot / sayt)")
+        context.user_data["step"] = "service"
 
-    # 1️⃣ Ism familiya
-    if step == "name":
-        users[user_id]["name"] = text
-        users[user_id]["step"] = "service"
-        await update.message.reply_text(
-            "🛠 Kerakli xizmatni tanlang:",
-            reply_markup=services_keyboard
+    elif context.user_data.get("step") == "service":
+        name = context.user_data["name"]
+        phone = context.user_data["phone"]
+
+        # ADMINGA YUBORISH
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f"🆕 BUYURTMA:\n👤 {name}\n📞 {phone}\n💼 {text}"
         )
 
-    # 2️⃣ Xizmat tanlash
-    elif step == "service":
-        if text == "📝 Boshqa xizmat":
-            users[user_id]["step"] = "custom_service"
-            await update.message.reply_text("✍️ Qanday xizmat kerakligini yozing:")
-        else:
-            users[user_id]["service"] = text
-            users[user_id]["step"] = "message"
-            await update.message.reply_text("📝 Muammo yoki xabaringizni yozing:")
+        await update.message.reply_text("✅ Buyurtmangiz yuborildi! Tez orada bog‘lanamiz.")
 
-    # 3️⃣ Boshqa xizmat nomi
-    elif step == "custom_service":
-        users[user_id]["service"] = text
-        users[user_id]["step"] = "message"
-        await update.message.reply_text("📝 Muammo yoki xabaringizni yozing:")
+        context.user_data.clear()
 
-    # 4️⃣ Asosiy xabar
-    elif step == "message":
-        name = users[user_id]["name"]
-        service = users[user_id]["service"]
-        message = text
+    # ADMIN MESSAGE
+    elif context.user_data.get("step") == "admin_message":
+        user = update.message.from_user
 
-        # USERNAME olish
-        username = user.username
-        if username:
-            username = "@" + username
-        else:
-            username = "mavjud emas"
-
-        admin_text = (
-            "📩 Yangi buyurtma!\n\n"
-            f"👤 Ism: {name}\n"
-            f"🛠 Xizmat: {service}\n"
-            f"📝 Xabar: {message}\n"
-            f"👤 Username: {username}"
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f"📩 Xabar:\n👤 {user.first_name}\n🆔 {user.id}\n\n{text}"
         )
 
-        await context.bot.send_message(chat_id=ADMIN_ID, text=admin_text)
+        await update.message.reply_text("✅ Xabaringiz yuborildi!")
+        context.user_data.clear()
 
-        await update.message.reply_text(
-            "✅ Buyurtmangiz yuborildi!\nTez orada siz bilan bog‘lanamiz 😊"
-        )
+# APP
+app = ApplicationBuilder().token(TOKEN).build()
 
-        users[user_id]["step"] = "done"
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CallbackQueryHandler(button))
+app.add_handler(MessageHandler(filters.TEXT, message))
 
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-    print("🤖 Bot ishga tushdi...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+app.run_polling()
